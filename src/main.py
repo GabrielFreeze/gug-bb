@@ -23,9 +23,6 @@ PINK    = [200, 36,209,255]
 GREY    = [115,112,113,255]
 ORANGE  = [217,162, 11,255]
 
-dpg.create_context()
-dpg.create_viewport(title='Boozy Bingo Manager', width=MAX_W,height=MAX_H+60)
-
 kwargs = dict(
     label="Boozy Bingo Manager",
     no_bring_to_front_on_focus=True,
@@ -66,27 +63,6 @@ def load_grid(grid_idx:int):
                        sep=';',header=None)
     grid = grid.to_numpy().tolist()
     return grid
-
-def clear_btn_callback(sender,app_data,user_data):
-    display = user_data['display']
-    display_cells = user_data['grid_cells']
-    info = user_data['info']
-
-    #Clear table
-    for y in range(GRID_Y):
-        for x in range(GRID_X):
-            dpg.set_value(display_cells[y][x], "")
-            dpg.highlight_table_cell(display,y,x, GREY)
-
-    #Clear status info output box
-    dpg.set_value(info,"Status info will show up here..")
-    dpg.configure_item(info, color=GREY)
-def round_btn_callback(sender,app_data,user_data):
-    pass
-
-    
-
-
 def highlight_table_row(grid,row,color):
     for x in range(GRID_X):
         dpg.highlight_table_cell(grid,row,x, color)
@@ -209,7 +185,39 @@ def prev_btn_callback(sender,app_data,user_data):
         items=display_songs,
         default_value=display_songs[n%len(songs[dpg.get_value("round_n")])]
     )
+def clear_btn_callback(sender,app_data,user_data):
+    display = user_data['display']
+    display_cells = user_data['grid_cells']
+    info = user_data['info']
 
+    #Clear table
+    for y in range(GRID_Y):
+        for x in range(GRID_X):
+            dpg.set_value(display_cells[y][x], "")
+            dpg.highlight_table_cell(display,y,x, GREY)
+
+    #Clear status info output box
+    dpg.set_value(info,"Status info will show up here..")
+    dpg.configure_item(info, color=GREY)
+def round_btn_callback(sender,app_data,user_data):
+    
+    #Clear grid and textbox
+    clear_btn_callback(sender,app_data,user_data)
+
+    #Update round number
+    round_n = (dpg.get_value("round_n")+1)%2
+    dpg.set_value("round_n", round_n)
+    dpg.set_value(user_data['round_counter_text'], f"Round: {round_n+1}")
+
+    #Update song counter
+    dpg.set_value("song_counter", 0)
+    dpg.set_value(user_data['song_counter_text'],  f"Song: 0")
+
+    #Update playlist
+    dpg.configure_item("playlist", items=songs[round_n])
+
+dpg.create_context()
+dpg.create_viewport(title='Bingo Booze BBQ Manager', width=MAX_W,height=MAX_H+60)
 
 #Prepare Global Values
 with dpg.value_registry():
@@ -232,6 +240,8 @@ with dpg.texture_registry():
 
 with dpg.window(width=MAX_W, height=MAX_H,**kwargs):
     dpg.bind_font(default_font) #Set Font
+    user_data = {}
+
 
     with dpg.group(horizontal=True):
         #PlayList Window
@@ -247,20 +257,19 @@ with dpg.window(width=MAX_W, height=MAX_H,**kwargs):
                 dpg.bind_item_font(playlist,list_font)
                 dpg.bind_item_font(playlist_label,label_font)
                 
-                nav_user_data = {}
                 with dpg.child_window(width=0.25*MAX_W + PAD,no_scroll_with_mouse=True):
                     with dpg.group(horizontal=True):     
                         prev_btn = dpg.add_button(
                             enabled=True, label="« PREV",
                             callback=prev_btn_callback,
-                            user_data=nav_user_data,
+                            user_data=user_data,
                             width=MAX_W//8,
                             pos=(0,0),
                         )
                         next_btn = dpg.add_button(
                             enabled=True, label="NEXT »",
                             callback=next_btn_callback,
-                            user_data=nav_user_data,
+                            user_data=user_data,
                             width=MAX_W//8,
                             pos=(MAX_W//8,0),
                         )
@@ -290,7 +299,7 @@ with dpg.window(width=MAX_W, height=MAX_H,**kwargs):
                 #Add placeholder text in cells
                 for i in range(GRID_Y):
                     with dpg.table_row(height= GRID_H//GRID_X):
-                      for j in range(GRID_X):
+                        for j in range(GRID_X):
                             dpg.highlight_table_cell(grid, i, j, GREY)
                             grid_cells[i][j] = dpg.add_text(
                                 f"\n\n",
@@ -298,7 +307,6 @@ with dpg.window(width=MAX_W, height=MAX_H,**kwargs):
                                 indent=CELL_TEXT_INDENT
                             )
             
-
             #Dashbaord Section
             with dpg.child_window(width=GRID_W-15,autosize_y=True):
                 with dpg.group(horizontal=True):
@@ -307,17 +315,15 @@ with dpg.window(width=MAX_W, height=MAX_H,**kwargs):
                             search_label = dpg.add_text("Search Menu",indent=PAD)
                             dpg.bind_item_font(search_label,label_font)
 
-                            callback_userdata = {
-                                "display"   : grid,
-                                "grid_cells": grid_cells,
-                            }
+                            user_data["display"]    = grid
+                            user_data["grid_cells"] = grid_cells
 
                             #Grid Input + Search Button
                             with dpg.group(horizontal=True):
                                 dpg.add_text("Enter Grid:")
                                 grid_input = dpg.add_input_text(
                                     callback=search_btn_callback,
-                                    user_data=callback_userdata,
+                                    user_data=user_data,
                                     decimal=True,on_enter=True,
                                     width=MAX_W//12,
                                     hint="")
@@ -328,7 +334,7 @@ with dpg.window(width=MAX_W, height=MAX_H,**kwargs):
                                 callback =_search_btn_callback,
                                 user_data = {
                                     "sender": grid_input,
-                                    "user_data":callback_userdata,
+                                    "user_data":user_data,
                                 },
                                 width=GRID_W//4 - 15,
                             )
@@ -338,25 +344,27 @@ with dpg.window(width=MAX_W, height=MAX_H,**kwargs):
                             #Show round and song number information
                             with dpg.group(horizontal=True):
                                 dpg.add_spacer(width=PAD*3)
-                                round_counter_text = dpg.add_text("Round: 1")
+                                round_counter_text = dpg.add_text(label="round_counter_text",
+                                                                    default_value="Round: 1")
                                 dpg.add_text("|")
-                                song_counter_text = dpg.add_text("Song: 1")
+                                song_counter_text = dpg.add_text(label="song_counter_text",
+                                                                    default_value="Song: 1")
 
                                 #So they can be modified by the navigation button callbacks
-                                nav_user_data['round_counter_text'] = round_counter_text
-                                nav_user_data['song_counter_text']  = song_counter_text
+                                user_data['round_counter_text'] = round_counter_text
+                                user_data['song_counter_text']  = song_counter_text
                             
                             
                             clear_btn = dpg.add_button(
                                 enabled=True, label="CLEAR",
                                 callback = clear_btn_callback,
-                                user_data = callback_userdata,
+                                user_data = user_data,
                                 width=GRID_W//4 - 15,
                             )
                             round_btn = dpg.add_button(
                                 enabled=True, label="NEXT ROUND",
                                 callback = round_btn_callback,
-                                user_data = callback_userdata,
+                                user_data = user_data,
                                 width=GRID_W//4 - 15,
                             )
 
@@ -371,12 +379,13 @@ with dpg.window(width=MAX_W, height=MAX_H,**kwargs):
                             color=GREY,
                         )
                         dpg.bind_item_font(info,grid_font)
-                        callback_userdata["info"] = info
-
-
+                        user_data["info"] = info
 
 
 dpg.setup_dearpygui()
 dpg.show_viewport()
 dpg.start_dearpygui()
 dpg.destroy_context()
+
+
+
